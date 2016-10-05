@@ -8,6 +8,7 @@ import datetime
 import requests as http
 from twilio.rest import TwilioRestClient
 
+
 try:
     TWILIO_ACCOUNT_SID = os.environ['TWILIO_ACCOUNT_SID']
     TWILIO_AUTH_TOKEN = os.environ['TWILIO_AUTH_TOKEN']
@@ -15,11 +16,8 @@ except KeyError as e:
     print "Please set the environment variable {key}".format(key=e)
     sys.exit(1)
 
-THRESHOLD_PRICE = 13000
 
-
-def current_timestamp():
-    datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+THRESHOLD_PRICE = 11800
 
 
 def send_notification():
@@ -28,11 +26,10 @@ def send_notification():
     body = "Price has fallen below your threshold - {amount}".format(
         amount=THRESHOLD_PRICE)
 
-    message = twilio.messages.create(body=body,
-        to="+525517983239",
-        from_="+12569608656")
+    message = twilio.messages.create(
+        body=body, to="+525517983239", from_="+19253923663")
 
-    store_notification(message.sid, body, amount)
+    store_notification(message.sid, body, THRESHOLD_PRICE)
 
 
 def store_notification(id, body, amount):
@@ -40,8 +37,9 @@ def store_notification(id, body, amount):
 
     with connection:
         cursor = connection.cursor()
-        cursor.execute("INSERT INTO notifications VALUES(?, ?, ?, ?)",
-            id, body, amount, current_timestamp())
+        cursor.execute(
+            "INSERT INTO notifications VALUES(?, ?, ?, CURRENT_TIMESTAMP)",
+            [id, body, amount])
 
 
 def should_send_notification():
@@ -51,17 +49,17 @@ def should_send_notification():
         cursor = connection.cursor()
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS notifications (
-                id INTEGER NOT NULL,
+                id CHAR(100),
                 body CHAR(255),
                 price INTEGER,
-                created_at TIMESTAMP DEFAULT NULL);""")
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);""")
 
-        cursor.execute("SELECT * FROM notifications WHERE created_at >= ? LIMIT 1;",
-            current_timestamp())
+        # Check if there is notification with the current date
+        cursor.execute(
+            """SELECT * FROM notifications
+                WHERE DATE(created_at) = DATE(CURRENT_TIMESTAMP) LIMIT 1;""")
 
-        row = cursor.fetchone()
-
-        return row == None
+        return cursor.fetchone() == None
 
 
 def main():
